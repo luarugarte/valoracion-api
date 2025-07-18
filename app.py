@@ -15,6 +15,10 @@ def datos():
         "ticker": ticker.upper(),
         "precio": info.get("currentPrice"),
         "fcf": info.get("freeCashflow"),
+        "marketCap": info.get("marketCap"),
+        "enterpriseValue": enterprise_value,
+        # Calcula evCfo solo si tienes ambos valores
+        "evCfo": (enterprise_value and fcf) and round(enterprise_value / fcf, 2),
         "acciones": info.get("sharesOutstanding"),
         "wacc": 0.08,  # Valor por defecto
         "g": 0.02,     # Valor por defecto
