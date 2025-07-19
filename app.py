@@ -5,8 +5,6 @@ import logging
 
 app = Flask(__name__)
 CORS(app)
-
-# Configura logging a stdout para que Render lo capture
 logging.basicConfig(level=logging.INFO)
 
 @app.route("/datos", methods=["GET"])
@@ -19,9 +17,9 @@ def datos():
         stock = yf.Ticker(ticker)
         info = stock.info or {}
 
-        # Manejo seguro de stock.cashflow (DataFrame) sin usar 'or {}'
+        # Manejo seguro de cashflow
         try:
-            cf_df = stock.cashflow  # puede devolver DataFrame o None
+            cf_df = stock.cashflow
             if cf_df is None or getattr(cf_df, "empty", False):
                 cashflow = {}
             else:
@@ -32,7 +30,7 @@ def datos():
         # Precio con fallback
         precio = info.get("currentPrice") or info.get("regularMarketPrice")
 
-        # FCF directo desde info o bien manualmente desde cashflow
+        # FCF directo o calculado
         fcf = info.get("freeCashflow")
         if fcf is None:
             try:
@@ -40,24 +38,25 @@ def datos():
                 capex = cashflow.get("Capital Expenditures", [None])[0]
                 if op is not None and capex is not None:
                     fcf = op - capex
-            except Exception:
+            except:
                 fcf = None
 
-        # EPS y P/E con fallback seguro
+        # EPS y P/E
         eps = info.get("forwardEps") or info.get("epsTrailingTwelveMonths") or 0
         pe  = info.get("forwardPE") or info.get("trailingPE") or None
 
         # Market cap y enterprise value
-        market_cap = info.get("marketCap")
+        market_cap       = info.get("marketCap")
         enterprise_value = info.get("enterpriseValue")
-
-        # EV/CFO
-        ev_cfo = None
+        ev_cfo           = None
         if fcf and enterprise_value:
             try:
                 ev_cfo = round(enterprise_value / fcf, 2)
-            except Exception:
+            except:
                 ev_cfo = None
+
+        # Objetivo de precio a 1 año (analyst target mean)
+        target_price = info.get("targetMeanPrice")  # suele ser el consensus one-year target
 
         response = {
             "ticker":         ticker,
@@ -73,7 +72,8 @@ def datos():
             "roe":            info.get("returnOnEquity"),
             "marketCap":      market_cap,
             "enterpriseValue": enterprise_value,
-            "evCfo":          ev_cfo
+            "evCfo":          ev_cfo,
+            "targetPrice":    target_price
         }
 
         return jsonify(response)
