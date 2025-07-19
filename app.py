@@ -17,6 +17,10 @@ def datos():
         stock = yf.Ticker(ticker)
         info = stock.info or {}
 
+        shares_outstanding = info.get("sharesOutstanding")      # acciones
+        cash               = info.get("totalCash")              # caja
+        debt               = info.get("totalDebt")              # deuda
+
         # Manejo seguro de cashflow
         try:
             cf_df = stock.cashflow
@@ -75,9 +79,9 @@ def datos():
             "evCfo":          ev_cfo,
             "targetPrice":    target_price
             # NUEVOS -----------------
-            "sharesOutstanding": sharesOutstanding,
-            "cash":              totalCash,
-            "debt":              totalDebt,
+            "sharesOutstanding": shares_outstanding,
+            "cash":              cash,
+            "debt":              debt,
         }
 
         return jsonify(response)
