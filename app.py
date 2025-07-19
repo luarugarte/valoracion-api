@@ -77,7 +77,7 @@ def datos():
             "marketCap":      market_cap,
             "enterpriseValue": enterprise_value,
             "evCfo":          ev_cfo,
-            "targetPrice":    target_price
+            "targetPrice":    target_price,
             # NUEVOS -----------------
             "sharesOutstanding": shares_outstanding,
             "cash":              cash,
