@@ -75,9 +75,9 @@ def datos():
             "evCfo":          ev_cfo,
             "targetPrice":    target_price
             # NUEVOS -----------------
-            "sharesOutstanding": shares_outstanding,
-            "cash":              cash,
-            "debt":              debt,
+            "sharesOutstanding": sharesOutstanding,
+            "cash":              totalCash,
+            "debt":              totalDebt,
         }
 
         return jsonify(response)
