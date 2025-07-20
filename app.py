@@ -9,6 +9,21 @@ app = Flask(__name__)
 CORS(app)
 logging.basicConfig(level=logging.INFO)
 
+# Mapeo P/E promedio por sector (2025E)
+SECTOR_PE = {
+    "Technology":             30.2,
+    "Financial Services":     18.0,
+    "Consumer Cyclical":      27.2,
+    "Communication Services": 19.6,
+    "Industrials":            25.9,
+    "Healthcare":             16.8,
+    "Consumer Defensive":     20.1,
+    "Energy":                 16.3,
+    "Basic Materials":        23.6,
+    "Real Estate":            15.3,
+    "Utilities":              18.5,
+}
+
 def obtener_pe_sector(sector_name: str) -> float:
     """
     Dada la cadena de sector (por ejemplo "Technology"),
@@ -43,6 +58,7 @@ def datos():
         info  = stock.info or {}
 
         sector = info.get("sector") or ""    # p.ej. "Technology"
+        pe_sector = SECTOR_PE.get(sector)  # filtrado automático
 
         company_name = info.get("longName") or info.get("shortName") or ticker
 
