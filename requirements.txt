@@ -3,3 +3,4 @@ flask-cors
 yfinance
 requests
 beautifulsoup4
+gunicorn
