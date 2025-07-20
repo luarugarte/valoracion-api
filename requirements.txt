@@ -1,4 +1,5 @@
 flask
-yfinance
 flask-cors
-gunicorn
+yfinance
+requests
+beautifulsoup4
