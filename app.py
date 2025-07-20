@@ -58,7 +58,7 @@ def datos():
         info  = stock.info or {}
 
         sector = info.get("sector") or ""    # p.ej. "Technology"
-        pe_sector = SECTOR_PE.get(sector)  # filtrado automático
+        PER_sector = SECTOR_PE.get(sector)  # filtrado automático
 
         company_name = info.get("longName") or info.get("shortName") or ticker
 
@@ -139,7 +139,7 @@ def datos():
             "enterpriseValue":   enterprise_value,
             "evCfo":             ev_cfo,
             "targetPrice":       target_price,
-            "peSector":          pe_sector,
+            "peSector":          PER_sector,
         }
 
         return jsonify(response)
