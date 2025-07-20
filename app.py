@@ -42,6 +42,8 @@ def datos():
         stock = yf.Ticker(ticker)
         info  = stock.info or {}
 
+        sector = info.get("sector") or ""    # p.ej. "Technology"
+
         company_name = info.get("longName") or info.get("shortName") or ticker
 
         # ── Fundamental data ──────────────────────────────────────────
@@ -103,7 +105,8 @@ def datos():
         # ── Respuesta final ────────────────────────────────────────────
         response = {
             "ticker":            ticker,
-            "companyName":        company_name,
+            "companyName":       company_name,
+            "sector":            sector,
             "precio":            precio,
             "fcf":               fcf,
             "wacc":              0.08,
