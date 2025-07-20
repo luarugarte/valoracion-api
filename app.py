@@ -2,10 +2,35 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import yfinance as yf
 import logging
+import requests
+from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 CORS(app)
 logging.basicConfig(level=logging.INFO)
+
+def obtener_pe_sector(sector_name: str) -> float:
+    """
+    Dada la cadena de sector (por ejemplo "Technology"),
+    construye el slug esperado por Yahoo (ms_technology),
+    descarga la página de screener y extrae el PE Ratio (TTM).
+    """
+    slug = "ms_" + sector_name.lower().replace(" ", "_")
+    url = f"https://finance.yahoo.com/screener/predefined/{slug}"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    resp = requests.get(url, headers=headers, timeout=5)
+    resp.raise_for_status()
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+    # Busca la celda de la primera fila que contenga "PE Ratio (TTM)"
+    cell = soup.select_one("table tbody tr td[data-col1='PE Ratio (TTM)']")
+    if not cell:
+        return None
+    text = cell.get_text().replace(",", "").strip()
+    try:
+        return float(text)
+    except ValueError:
+        return None
 
 @app.route("/datos", methods=["GET"])
 def datos():
@@ -15,13 +40,16 @@ def datos():
 
     try:
         stock = yf.Ticker(ticker)
-        info = stock.info or {}
+        info  = stock.info or {}
 
-        shares_outstanding = info.get("sharesOutstanding")      # acciones
-        cash               = info.get("totalCash")              # caja
-        debt               = info.get("totalDebt")              # deuda
+        # ── Fundamental data ──────────────────────────────────────────
+        shares_outstanding = info.get("sharesOutstanding")
+        cash               = info.get("totalCash") or info.get("cashAndShortTermInvestments")
+        short_debt         = info.get("shortTermDebt") or 0
+        long_debt          = info.get("longTermDebt")  or 0
+        debt               = info.get("totalDebt") or (short_debt + long_debt)
 
-        # Manejo seguro de cashflow
+        # ── Safe cashflow ──────────────────────────────────────────────
         try:
             cf_df = stock.cashflow
             if cf_df is None or getattr(cf_df, "empty", False):
@@ -31,57 +59,65 @@ def datos():
         except Exception:
             cashflow = {}
 
-        # Precio con fallback
+        # ── Price fallback ─────────────────────────────────────────────
         precio = info.get("currentPrice") or info.get("regularMarketPrice")
 
-        # FCF directo o calculado
+        # ── FCF ─────────────────────────────────────────────────────────
         fcf = info.get("freeCashflow")
         if fcf is None:
             try:
-                op = cashflow.get("Total Cash From Operating Activities", [None])[0]
-                capex = cashflow.get("Capital Expenditures", [None])[0]
+                op    = cashflow.get("Total Cash From Operating Activities", [None])[0]
+                capex = cashflow.get("Capital Expenditures",           [None])[0]
                 if op is not None and capex is not None:
                     fcf = op - capex
-            except:
+            except Exception:
                 fcf = None
 
-        # EPS y P/E
+        # ── EPS & P/E ──────────────────────────────────────────────────
         eps = info.get("forwardEps") or info.get("epsTrailingTwelveMonths") or 0
-        pe  = info.get("forwardPE") or info.get("trailingPE") or None
+        pe  = info.get("forwardPE")    or info.get("trailingPE")             or None
 
-        # Market cap y enterprise value
+        # ── Market cap & EV/CFO ────────────────────────────────────────
         market_cap       = info.get("marketCap")
         enterprise_value = info.get("enterpriseValue")
         ev_cfo           = None
         if fcf and enterprise_value:
             try:
                 ev_cfo = round(enterprise_value / fcf, 2)
-            except:
+            except Exception:
                 ev_cfo = None
 
-        # Objetivo de precio a 1 año (analyst target mean)
-        target_price = info.get("targetMeanPrice")  # suele ser el consensus one-year target
+        # ── Analyst target ──────────────────────────────────────────────
+        target_price = info.get("targetMeanPrice")
 
+        # ── P/E del sector (scraping) ──────────────────────────────────
+        sector = info.get("sector") or ""
+        try:
+            pe_sector = obtener_pe_sector(sector) if sector else None
+        except Exception as e:
+            app.logger.warning(f"No pude obtener PE sector para {sector}: {e}")
+            pe_sector = None
+
+        # ── Respuesta final ────────────────────────────────────────────
         response = {
-            "ticker":         ticker,
-            "precio":         precio,
-            "fcf":            fcf,
-            "wacc":           0.08,
-            "g":              0.02,
-            "acciones":       info.get("sharesOutstanding"),
-            "dividendo":      info.get("dividendRate"),
-            "eps":            eps,
-            "pe":             pe,
-            "bvps":           info.get("bookValue"),
-            "roe":            info.get("returnOnEquity"),
-            "marketCap":      market_cap,
-            "enterpriseValue": enterprise_value,
-            "evCfo":          ev_cfo,
-            "targetPrice":    target_price,
-            # NUEVOS -----------------
+            "ticker":            ticker,
+            "precio":            precio,
+            "fcf":               fcf,
+            "wacc":              0.08,
+            "g":                 0.02,
             "sharesOutstanding": shares_outstanding,
             "cash":              cash,
             "debt":              debt,
+            "dividendo":         info.get("dividendRate"),
+            "eps":               eps,
+            "pe":                pe,
+            "bvps":              info.get("bookValue"),
+            "roe":               info.get("returnOnEquity"),
+            "marketCap":         market_cap,
+            "enterpriseValue":   enterprise_value,
+            "evCfo":             ev_cfo,
+            "targetPrice":       target_price,
+            "peSector":          pe_sector,
         }
 
         return jsonify(response)
